@@ -19,6 +19,7 @@ export default function (opts = {}) {
       const tmp = builder.getBuildDirectory("fastly-tmp");
       builder.rimraf(tmp);
       builder.rimraf(out);
+      builder.mkdirp(tmp);
       builder.log.minor("Copying Static assets...");
       //copy static assests to tmp directory
       const static_dir = `${tmp}/static`;
@@ -59,7 +60,7 @@ export default function (opts = {}) {
         {
           replace: {
             SERVER: `${workerRelativePath}/index.js`,
-            MANIFEST: `${tmp}/manifest.js`,
+            MANIFEST: `../manifest.js`,
             STATICS: `../static-publisher/statics.js`,
           },
         }
