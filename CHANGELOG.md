@@ -1,5 +1,11 @@
 # sveltekit-adapter-fastly
 
+## 0.0.6
+
+### Patch Changes
+
+- 66f240a: Fix file pathing on non linux systems
+
 ## 0.0.5
 
 ### Patch Changes
