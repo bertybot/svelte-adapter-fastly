@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { posix, resolve } from "node:path";
 import { execSync } from "node:child_process";
+import { build } from "esbuild";
 import toml from "@iarna/toml";
 import readline from "node:readline/promises";
 import { fileURLToPath } from "node:url";
@@ -49,32 +50,6 @@ export default function (opts = {}) {
 
       const workerSource = `${tmp}/src`;
       const relativePath = posix.relative(tmp, builder.getServerDirectory());
-      const workerRelativePath = posix.relative(
-        workerSource,
-        builder.getServerDirectory()
-      );
-
-      builder.copy(
-        `${files}/handleSvelteKitRequest.js`,
-        `${workerSource}/handleSvelteKitRequest.js`,
-        {
-          replace: {
-            SERVER: `${workerRelativePath}/index.js`,
-            MANIFEST: `../manifest.js`,
-            STATICS: `../static-publisher/statics.js`,
-          },
-        }
-      );
-
-      builder.copy(
-        entry ? entry : `${files}/entry.js`,
-        `${workerSource}/entry.js`,
-        {
-          replace: {
-            "svelte-adapter-fastly": `./handleSvelteKitRequest.js`,
-          },
-        }
-      );
 
       let prerendered_entries = Array.from(builder.prerendered.pages.entries());
 
@@ -84,25 +59,67 @@ export default function (opts = {}) {
           { file: `${builder.config.kit.paths.base}/${file}` },
         ]);
       }
+      await build({
+        conditions: ["fastly"],
+        entryPoints: [entry ? entry : `${files}/entry.js`],
+        bundle: true,
+        outdir: workerSource,
+        write: true,
+        external: ["fastly:*"],
+        allowOverwrite: true,
+        format: "esm",
+        tsconfig: undefined,
+        plugins: [
+          {
+            name: "svelte-adapter-fastly",
+            setup(build) {
+              build.onResolve({ filter: /^svelte-adapter-fastly/ }, () => {
+                return { path: `${files}/handleSvelteKitRequest.js` };
+              });
+              build.onResolve({ filter: /^MANIFEST/ }, (args) => ({
+                path: args.path,
+                namespace: "svelte-adapter-fastly",
+              }));
 
-      writeFileSync(
-        `${tmp}/manifest.js`,
-        `export const manifest = ${builder.generateManifest({
-          relativePath,
-        })};\n\n` +
-          `export const prerendered = new Map(${JSON.stringify(
-            prerendered_entries
-          )});\n\n` +
-          `export const base_path = ${JSON.stringify(
-            builder.config.kit.paths.base
-          )};\n`
-      );
+              build.onResolve({ filter: /^STATICS/ }, () => {
+                return { path: `${tmp}/static-publisher/statics.js` };
+              });
+              build.onResolve({ filter: /^SERVER/ }, () => {
+                return { path: `${builder.getServerDirectory()}/index.js` };
+              });
+              build.onLoad(
+                { filter: /.*/, namespace: "svelte-adapter-fastly" },
+                async () => {
+                  return {
+                    loader: "js",
+                    resolveDir: tmp,
+                    contents:
+                      `export const manifest = ${builder.generateManifest({
+                        relativePath,
+                      })};\n\n` +
+                      `export const prerendered = new Map(${JSON.stringify(
+                        prerendered_entries
+                      )});\n\n` +
+                      `export const base_path = ${JSON.stringify(
+                        builder.config.kit.paths.base
+                      )};\n`,
+                  };
+                }
+              );
+            },
+          },
+        ],
+      });
 
       builder.log("Building worker...");
 
       console.log("creating wasm file");
       execSync(
-        `npx --package @fastly/js-compute js-compute-runtime src/entry.js ./bin/main.wasm`,
+        `npx --package @fastly/js-compute  js-compute-runtime ${
+          opts.experimentalTopLevelAwait
+            ? `--enable-experimental-top-level-await`
+            : ""
+        }  ${workerSource}/entry.js ./bin/main.wasm`,
         {
           cwd: `${tmp}`,
           stdio: "inherit",
