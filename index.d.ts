@@ -12,6 +12,7 @@ export interface AdapterOptions {
   entry?: string;
   staticPublishConfig?: string;
   silent?: boolean;
+  experimentalTopLevelAwait?: boolean;
 }
 
 export type FastlyConfig = {
