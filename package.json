@@ -1,6 +1,6 @@
 {
   "name": "svelte-adapter-fastly",
-  "version": "0.0.6",
+  "version": "0.1.0",
   "description": "SvelteKit adapter for Fastly Compute@Edge",
   "keywords": [
     "adapter",
