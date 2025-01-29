@@ -1,5 +1,12 @@
 # sveltekit-adapter-fastly
 
+## 0.1.0
+
+### Minor Changes
+
+- 3d7c8f2: - Added Build step for custom entry files. entry files can now be written in Typescript and handle relative imports.
+  - Added `experimentalTopLevelAwait` flag
+
 ## 0.0.6
 
 ### Patch Changes
